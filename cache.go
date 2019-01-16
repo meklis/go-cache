@@ -385,6 +385,27 @@ func (c *cache) IncrementUint(k string, n uint) (uint, error) {
 	return nv, nil
 }
 
+func (c *cache) IncrementUintWithSet(k string, n uint) (uint) {
+	var pv uint
+	c.mu.Lock()
+	v, found := c.items[k]
+	if found && v.Expired() {
+		c.mu.Unlock()
+		return 0
+	} else if !found {
+		pv = 0
+	} else {
+		pv = v.Object.(uint)
+	}
+	nv := pv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv
+}
+
+
+
 // Increment an item of type uintptr by n. Returns an error if the item's value
 // is not an uintptr, or if it was not found. If there is no error, the
 // incremented value is returned.
@@ -746,7 +767,30 @@ func (c *cache) DecrementUint(k string, n uint) (uint, error) {
 	c.mu.Unlock()
 	return nv, nil
 }
-
+func (c *cache) DecrementUintWithDelete(k string, n uint) (uint) {
+	var pv uint
+	c.mu.Lock()
+	v, found := c.items[k]
+	if found && v.Expired() {
+		delete(c.items, k)
+		c.mu.Unlock()
+		return 0
+	} else if !found {
+		c.mu.Unlock()
+		return  0
+	} else {
+		pv = v.Object.(uint)
+	}
+	nv := pv - n
+	if nv == 0 {
+		delete(c.items, k)
+	} else {
+		v.Object = nv
+		c.items[k] = v
+	}
+	c.mu.Unlock()
+	return nv
+}
 // Decrement an item of type uintptr by n. Returns an error if the item's value
 // is not an uintptr, or if it was not found. If there is no error, the
 // decremented value is returned.
